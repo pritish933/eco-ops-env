@@ -33,7 +33,7 @@ TASKS = {
     "easy_order_status": {
         "level": "easy",
         "ticket": (
-            "Customer (Alice): Hi, I placed order #101 a few days ago. "
+            "Customer (Pritish): Hi, I placed order #101 a few days ago. "
             "Can you tell me where it is right now?"
         ),
         "tools": ["search_order", "reply"],
@@ -42,7 +42,7 @@ TASKS = {
     "easy_product_info": {
         "level": "easy",
         "ticket": (
-            "Customer (Bob): I'm interested in the Wireless Headphones (SKU-A1). "
+            "Customer (Rajesh): I'm interested in the Wireless Headphones (SKU-A1). "
             "What's the price for those, and are they in stock?"
         ),
         "tools": ["search_product", "reply"],
@@ -52,7 +52,7 @@ TASKS = {
     "medium_address_update": {
         "level": "medium",
         "ticket": (
-            "Customer (Bob): Hey, I need to change the shipping address "
+            "Customer (Rajesh): Hey, I need to change the shipping address "
             "for my order #102 to '123 New Ave, Suite 4'. "
             "Can you check if it's shipped yet and update it?"
         ),
@@ -62,7 +62,7 @@ TASKS = {
     "medium_cancel_order": {
         "level": "medium",
         "ticket": (
-            "Customer (Diana): I want to cancel my order #104. "
+            "Customer (Priyanka): I want to cancel my order #104. "
             "I changed my mind about the purchase. Please check if it can be cancelled."
         ),
         "tools": ["search_order", "cancel_order", "reply"],
@@ -71,7 +71,7 @@ TASKS = {
     "medium_multi_order": {
         "level": "medium",
         "ticket": (
-            "Customer (Frank): I have two orders — #106 and #101. "
+            "Customer (Debapriya): I have two orders — #106 and #101. "
             "Can you check the status of both and let me know what's going on?"
         ),
         "tools": ["search_order", "reply"],
@@ -81,7 +81,7 @@ TASKS = {
     "hard_policy_refund": {
         "level": "hard",
         "ticket": (
-            "Customer (Charlie): My order #103 was supposed to arrive 19 days ago "
+            "Customer (Priyanka): My order #103 was supposed to arrive 19 days ago "
             "and it's still not here! I want a refund. Check your policy and process it."
         ),
         "tools": ["search_order", "get_policy", "refund_order", "reply"],
@@ -90,7 +90,7 @@ TASKS = {
     "hard_vip_escalation": {
         "level": "hard",
         "ticket": (
-            "Customer (Eve): I'm a VIP customer and my order #105 has been delayed "
+            "Customer (Sarbapriya): I'm a VIP customer and my order #105 has been delayed "
             "by 20 days. This is unacceptable! I need this escalated to a senior "
             "agent and I want a refund processed immediately per your delay policy."
         ),
@@ -115,32 +115,32 @@ class EcoOpsEnvironment(Environment):
     # ── Mock Databases ─────────────────────────────────────────────
     BASE_ORDERS: Dict[int, Dict[str, Any]] = {
         101: {
-            "status": "In Transit", "customer": "Alice", "priority": "normal",
+            "status": "In Transit", "customer": "Pritish", "priority": "normal",
             "address": "123 Beta St", "product": "SKU-A1",
             "delay_days": 2, "refunded": False,
         },
         102: {
-            "status": "Processing", "customer": "Bob", "priority": "normal",
+            "status": "Processing", "customer": "Rajesh", "priority": "normal",
             "address": "456 Old St", "product": "SKU-B2",
             "delay_days": 5, "refunded": False,
         },
         103: {
-            "status": "Delivered", "customer": "Charlie", "priority": "VIP",
+            "status": "Delivered", "customer": "Raiyan", "priority": "VIP",
             "address": "789 Gamma Rd", "product": "SKU-C3",
             "delay_days": 19, "refunded": False,
         },
         104: {
-            "status": "Processing", "customer": "Diana", "priority": "normal",
+            "status": "Processing", "customer": "Priyanka", "priority": "normal",
             "address": "321 Delta Ln", "product": "SKU-A1",
             "delay_days": 0, "refunded": False,
         },
         105: {
-            "status": "Shipped", "customer": "Eve", "priority": "VIP",
+            "status": "Shipped", "customer": "Sarbapriya", "priority": "VIP",
             "address": "654 Epsilon Ave", "product": "SKU-D4",
             "delay_days": 20, "refunded": False,
         },
         106: {
-            "status": "Processing", "customer": "Frank", "priority": "normal",
+            "status": "Processing", "customer": "Debapriya", "priority": "normal",
             "address": "987 Zeta Blvd", "product": "SKU-E5",
             "delay_days": 1, "refunded": False,
         },
@@ -392,7 +392,7 @@ class EcoOpsEnvironment(Environment):
             score = 0.0
             if "transit" in reply_lower or "in transit" in reply_lower:
                 score += 0.5   # Correct status
-            if "alice" in reply_lower:
+            if "pritish" in reply_lower:
                 score += 0.2   # Addressed customer by name
             if "101" in reply:
                 score += 0.15  # Referenced order number
@@ -438,7 +438,7 @@ class EcoOpsEnvironment(Environment):
                 score += 0.2   # Checked status first
             if "cancel" in reply_lower:
                 score += 0.15  # Confirmed cancellation
-            if "diana" in reply_lower:
+            if "priyanka" in reply_lower:
                 score += 0.15  # Addressed by name
             return min(score, 1.0)
 
@@ -472,7 +472,7 @@ class EcoOpsEnvironment(Environment):
                 score += 0.15  # Investigated order
             if "refund" in reply_lower:
                 score += 0.15  # Confirmed to customer
-            if "charlie" in reply_lower:
+            if "priyanka" in reply_lower:
                 score += 0.1   # Addressed by name
             return min(score, 1.0)
 
@@ -495,7 +495,7 @@ class EcoOpsEnvironment(Environment):
                 score += 0.05  # Bad: refund without policy
             if target in self._state.orders_searched:
                 score += 0.1
-            if "eve" in reply_lower:
+            if "sarbapriya" in reply_lower:
                 score += 0.1
             if "escalat" in reply_lower:
                 score += 0.1
