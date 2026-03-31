@@ -98,18 +98,24 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
     obs = env.reset(task_id=task_id)
     print(f"Ticket: {obs.ticket[:80]}...")
 
-    history: list = []
+    # Build a proper multi-turn conversation for full context
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": textwrap.dedent(f"""
+            Step 1 of {MAX_STEPS}
+            Customer Ticket: {obs.ticket}
+            Last Response: {obs.action_response}
+            Tools Available: {obs.tools_available}
+
+            What is your next action? Reply with JSON only.
+        """).strip()},
+    ]
 
     for step in range(1, MAX_STEPS + 1):
-        prompt = build_prompt(step, obs, history)
-
         try:
             completion = client.chat.completions.create(
                 model=MODEL_NAME,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
+                messages=messages,
                 temperature=0.1,
                 max_tokens=300,
             )
@@ -125,11 +131,20 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
         r = obs.reward or 0.0
         print(f"    → {obs.action_response[:80]}... | reward={r:.2f}")
 
-        history.append(f"[{action.action_type}] → {obs.action_response[:60]}")
-
         if obs.done:
             print(f"  ✓ Task complete! Grader score: {r:.2f}")
             return max(0.0, float(r))
+
+        # Add assistant response + next user prompt to conversation
+        messages.append({"role": "assistant", "content": text})
+        messages.append({"role": "user", "content": textwrap.dedent(f"""
+            Step {step + 1} of {MAX_STEPS}
+            Customer Ticket: {obs.ticket}
+            Last Response: {obs.action_response}
+            Tools Available: {obs.tools_available}
+
+            What is your next action? Reply with JSON only.
+        """).strip()})
 
     return 0.0
 

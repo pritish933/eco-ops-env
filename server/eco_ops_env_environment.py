@@ -12,6 +12,7 @@ An AI agent resolves customer support tickets by interacting with a
 simulated internal database, product catalog, and company policies.
 """
 
+import copy
 import random
 from uuid import uuid4
 from typing import Dict, Any, List, Optional
@@ -172,6 +173,7 @@ class EcoOpsEnvironment(Environment):
     def __init__(self):
         self._state = EcoOpsState()
         self._tools: list = []
+        self._episode_count = 0
         self.reset()
 
     # ═══════════════════════════════════════════════════════════════
@@ -192,11 +194,14 @@ class EcoOpsEnvironment(Environment):
             task_id = random.choice(list(TASKS.keys()))
             task = TASKS[task_id]
 
-        # Isolated copies
-        db_orders = {k: dict(v) for k, v in self.BASE_ORDERS.items()}
-        db_products = {k: dict(v) for k, v in self.BASE_PRODUCTS.items()}
+        # Deep-copy to guarantee complete isolation between episodes
+        db_orders = copy.deepcopy(self.BASE_ORDERS)
+        db_products = copy.deepcopy(self.BASE_PRODUCTS)
 
-        self._tools = task["tools"]
+        self._tools = list(task["tools"])  # fresh list copy
+        self._episode_count += 1
+
+        # Build a completely new state — no carryover from previous episode
         self._state = EcoOpsState(
             episode_id=episode_id or str(uuid4()),
             step_count=0,
