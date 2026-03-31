@@ -12,6 +12,7 @@ MANDATORY env vars:
 
 import os
 import json
+import time
 import textwrap
 from typing import Dict
 
@@ -25,6 +26,11 @@ API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "dummy_key")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 MAX_STEPS = 7
+
+# ── Retry & Rate-Limit Configuration ──────────────────────────────
+MAX_RETRIES = 3           # Number of retries on API failure
+RETRY_BASE_DELAY = 10     # Base delay in seconds (exponential backoff)
+DELAY_BETWEEN_CALLS = 2   # Seconds to wait between every API call
 
 SYSTEM_PROMPT = textwrap.dedent("""
     You are an AI Support Engineering Agent (Eco-Ops).
@@ -58,21 +64,6 @@ SYSTEM_PROMPT = textwrap.dedent("""
 """).strip()
 
 
-def build_prompt(step: int, obs, history: list) -> str:
-    hist = "\n".join(history[-5:]) if history else "No previous actions."
-    return textwrap.dedent(f"""
-    Step {step} of {MAX_STEPS}
-    Customer Ticket: {obs.ticket}
-    Last Response: {obs.action_response}
-    Tools Available: {obs.tools_available}
-
-    Recent History:
-    {hist}
-
-    What is your next action? Reply with JSON only.
-    """).strip()
-
-
 def parse_action(text: str) -> EcoOpsAction:
     try:
         clean = text.replace("```json", "").replace("```", "").strip()
@@ -86,6 +77,44 @@ def parse_action(text: str) -> EcoOpsAction:
             action_type="reply",
             action_args={"message": "I apologize, I encountered an error processing your request."},
         )
+
+
+def call_llm_with_retry(client: OpenAI, messages: list) -> str:
+    """
+    Call the LLM with retry logic and exponential backoff.
+    Handles 402 (credits depleted) and other transient errors.
+    """
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            # Small delay before each call to avoid rate limits
+            if attempt > 1:
+                delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))  # 20s, 40s, 80s
+                print(f"    ⏳ Retry {attempt}/{MAX_RETRIES} — waiting {delay}s for credits to refresh...")
+                time.sleep(delay)
+            else:
+                time.sleep(DELAY_BETWEEN_CALLS)  # 2s delay between normal calls
+
+            completion = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=300,
+            )
+            return completion.choices[0].message.content or ""
+
+        except Exception as e:
+            error_str = str(e)
+            is_rate_limit = "402" in error_str or "429" in error_str or "rate" in error_str.lower()
+
+            if is_rate_limit and attempt < MAX_RETRIES:
+                print(f"  ⚠️  API rate limit (attempt {attempt}/{MAX_RETRIES}): {error_str[:80]}")
+                continue
+            else:
+                print(f"  ❌ API Error (attempt {attempt}/{MAX_RETRIES}): {error_str[:100]}")
+                if attempt == MAX_RETRIES:
+                    return '{"action_type": "reply", "action_args": {"message": "API failure."}}'
+
+    return '{"action_type": "reply", "action_args": {"message": "API failure."}}'
 
 
 def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
@@ -112,17 +141,7 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
     ]
 
     for step in range(1, MAX_STEPS + 1):
-        try:
-            completion = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=messages,
-                temperature=0.1,
-                max_tokens=300,
-            )
-            text = completion.choices[0].message.content or ""
-        except Exception as e:
-            print(f"  API Error: {e}")
-            text = '{"action_type": "reply", "action_args": {"message": "API failure."}}'
+        text = call_llm_with_retry(client, messages)
 
         action = parse_action(text)
         print(f"  Step {step}: {action.action_type}({action.action_args})")
@@ -152,6 +171,12 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
 def main():
     if not os.getenv("HF_TOKEN") and not os.getenv("API_KEY"):
         print("WARNING: HF_TOKEN / API_KEY not set. Using dummy key.")
+
+    print(f"\n🚀 Eco-Ops Inference Starting...")
+    print(f"   Model: {MODEL_NAME}")
+    print(f"   API:   {API_BASE_URL}")
+    print(f"   Retry: {MAX_RETRIES} attempts with {RETRY_BASE_DELAY}s backoff")
+    print(f"   Delay: {DELAY_BETWEEN_CALLS}s between calls\n")
 
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
     env = EcoOpsEnvironment()
