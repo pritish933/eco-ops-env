@@ -1,3 +1,11 @@
+---
+title: Eco Ops
+emoji: 🌍
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_port: 8000
+---
 # 🛡️ Eco-Ops: AI Support Engineering Environment
 
 > A **real-world** OpenEnv environment where an AI agent resolves customer support
