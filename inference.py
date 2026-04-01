@@ -11,10 +11,15 @@ MANDATORY env vars:
 """
 
 import os
+import sys
 import json
 import time
 import textwrap
 from typing import Dict
+
+# Fix Windows Unicode encoding for emoji/UTF-8 output
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from openai import OpenAI
 
@@ -89,7 +94,7 @@ def call_llm_with_retry(client: OpenAI, messages: list) -> str:
             # Small delay before each call to avoid rate limits
             if attempt > 1:
                 delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))  # 20s, 40s, 80s
-                print(f"    ⏳ Retry {attempt}/{MAX_RETRIES} — waiting {delay}s for credits to refresh...")
+                print(f"    [WAIT] Retry {attempt}/{MAX_RETRIES} - waiting {delay}s for credits to refresh...")
                 time.sleep(delay)
             else:
                 time.sleep(DELAY_BETWEEN_CALLS)  # 2s delay between normal calls
@@ -107,10 +112,10 @@ def call_llm_with_retry(client: OpenAI, messages: list) -> str:
             is_rate_limit = "402" in error_str or "429" in error_str or "rate" in error_str.lower()
 
             if is_rate_limit and attempt < MAX_RETRIES:
-                print(f"  ⚠️  API rate limit (attempt {attempt}/{MAX_RETRIES}): {error_str[:80]}")
+                print(f"  [WARN] API rate limit (attempt {attempt}/{MAX_RETRIES}): {error_str[:80]}")
                 continue
             else:
-                print(f"  ❌ API Error (attempt {attempt}/{MAX_RETRIES}): {error_str[:100]}")
+                print(f"  [ERR] API Error (attempt {attempt}/{MAX_RETRIES}): {error_str[:100]}")
                 if attempt == MAX_RETRIES:
                     return '{"action_type": "reply", "action_args": {"message": "API failure."}}'
 
@@ -151,7 +156,7 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
         print(f"    → {obs.action_response[:80]}... | reward={r:.2f}")
 
         if obs.done:
-            print(f"  ✓ Task complete! Grader score: {r:.2f}")
+            print(f"  [DONE] Task complete! Grader score: {r:.2f}")
             return max(0.0, float(r))
 
         # Add assistant response + next user prompt to conversation
@@ -172,7 +177,7 @@ def main():
     if not os.getenv("HF_TOKEN") and not os.getenv("API_KEY"):
         print("WARNING: HF_TOKEN / API_KEY not set. Using dummy key.")
 
-    print(f"\n🚀 Eco-Ops Inference Starting...")
+    print(f"\n[START] Eco-Ops Inference Starting...")
     print(f"   Model: {MODEL_NAME}")
     print(f"   API:   {API_BASE_URL}")
     print(f"   Retry: {MAX_RETRIES} attempts with {RETRY_BASE_DELAY}s backoff")
