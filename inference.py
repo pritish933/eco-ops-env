@@ -28,8 +28,8 @@ from models import EcoOpsAction
 
 # ── Mandatory Variables ────────────────────────────────────────────
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "dummy_key")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+HF_TOKEN = os.getenv("HF_TOKEN")
 MAX_STEPS = 7
 
 # ── Retry & Rate-Limit Configuration ──────────────────────────────
@@ -157,7 +157,7 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
 
         if obs.done:
             score = max(0.01, min(float(r), 0.99))
-            print(f"  [DONE] Task complete! Grader score: {score:.2f}")
+            print(f"  [STEP] Task complete! Grader score: {score:.2f}")
             return score
 
         # Add assistant response + next user prompt to conversation
@@ -175,8 +175,8 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
 
 
 def main():
-    if not os.getenv("HF_TOKEN") and not os.getenv("API_KEY"):
-        print("WARNING: HF_TOKEN / API_KEY not set. Using dummy key.")
+    if not HF_TOKEN:
+        print("WARNING: HF_TOKEN not set. LLM calls may fail.")
 
     print(f"\n[START] Eco-Ops Inference Starting...")
     print(f"   Model: {MODEL_NAME}")
@@ -184,16 +184,18 @@ def main():
     print(f"   Retry: {MAX_RETRIES} attempts with {RETRY_BASE_DELAY}s backoff")
     print(f"   Delay: {DELAY_BETWEEN_CALLS}s between calls\n")
 
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     env = EcoOpsEnvironment()
 
     scores: Dict[str, float] = {}
     by_level: Dict[str, list] = {"easy": [], "medium": [], "hard": []}
 
     for task_id, task_info in TASKS.items():
+        print(f"\n[STEP] Running task: {task_id}")
         score = run_task(env, client, task_id)
         scores[task_id] = score
         by_level[task_info["level"]].append(score)
+        print(f"[STEP] Task {task_id} score: {score:.2f}")
 
     # ── Summary ──
     print(f"\n{'*'*50}")
@@ -212,6 +214,7 @@ def main():
 
     total_avg = sum(scores.values()) / len(scores) if scores else 0.0
     print(f"\n  OVERALL AVERAGE: {total_avg:.2f} / 1.00")
+    print(f"\n[END] Eco-Ops Inference Complete.")
 
 
 if __name__ == "__main__":
