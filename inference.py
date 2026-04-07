@@ -156,8 +156,9 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
         print(f"    → {obs.action_response[:80]}... | reward={r:.2f}")
 
         if obs.done:
-            print(f"  [DONE] Task complete! Grader score: {r:.2f}")
-            return max(0.0, float(r))
+            score = max(0.01, min(float(r), 0.99))
+            print(f"  [DONE] Task complete! Grader score: {score:.2f}")
+            return score
 
         # Add assistant response + next user prompt to conversation
         messages.append({"role": "assistant", "content": text})
@@ -170,7 +171,7 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
             What is your next action? Reply with JSON only.
         """).strip()})
 
-    return 0.0
+    return 0.01  # exhausted steps without finishing
 
 
 def main():

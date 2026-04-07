@@ -369,6 +369,7 @@ class EcoOpsEnvironment(Environment):
         # Episode boundary
         if self._state.step_count >= 12 and not done:
             done = True
+            reward = self._clamp_score(0.0)  # timed out = worst score
             response += " | Episode terminated (max 12 steps reached)."
 
         return EcoOpsObservation(
@@ -380,11 +381,27 @@ class EcoOpsEnvironment(Environment):
         )
 
     # ═══════════════════════════════════════════════════════════════
+    #  SCORE CLAMPING
+    # ═══════════════════════════════════════════════════════════════
+    def _clamp_score(self, score: float) -> float:
+        """Clamp score to strictly between 0 and 1 (exclusive).
+
+        The OpenEnv evaluator requires scores in (0.0, 1.0) exclusive —
+        exactly 0.0 and exactly 1.0 are rejected.
+        """
+        score = max(0.0, min(score, 1.0))  # first, clamp to [0, 1]
+        if score <= 0.0:
+            return 0.01  # floor for worst case
+        if score >= 1.0:
+            return 0.99  # ceiling for perfect case
+        return round(score, 4)
+
+    # ═══════════════════════════════════════════════════════════════
     #  MULTI-FACTOR GRADER
     # ═══════════════════════════════════════════════════════════════
     def _grade(self, reply: str) -> float:
         """
-        Score the agent's performance 0.0 → 1.0.
+        Score the agent's performance strictly in (0.0, 1.0).
         Each task has weighted sub-criteria for granular scoring.
         """
         tid = self._state.task_id
@@ -403,7 +420,7 @@ class EcoOpsEnvironment(Environment):
                 score += 0.15  # Referenced order number
             if len(reply) > 20:
                 score += 0.15  # Substantive reply
-            return min(score, 1.0)
+            return self._clamp_score(score)
 
         # ── Easy: Product Info ────────────────────────────────────
         if tid == "easy_product_info":
@@ -416,7 +433,7 @@ class EcoOpsEnvironment(Environment):
                 score += 0.2   # Product name
             if len(reply) > 15:
                 score += 0.15  # Substantive
-            return min(score, 1.0)
+            return self._clamp_score(score)
 
         # ── Medium: Address Update ────────────────────────────────
         if tid == "medium_address_update":
@@ -432,7 +449,7 @@ class EcoOpsEnvironment(Environment):
                 score += 0.15  # Confirmed to customer
             if len(reply) > 15:
                 score += 0.1
-            return min(score, 1.0)
+            return self._clamp_score(score)
 
         # ── Medium: Cancel Order ──────────────────────────────────
         if tid == "medium_cancel_order":
@@ -445,7 +462,7 @@ class EcoOpsEnvironment(Environment):
                 score += 0.15  # Confirmed cancellation
             if "priyanka" in reply_lower:
                 score += 0.15  # Addressed by name
-            return min(score, 1.0)
+            return self._clamp_score(score)
 
         # ── Medium: Multi-Order ───────────────────────────────────
         if tid == "medium_multi_order":
@@ -461,7 +478,7 @@ class EcoOpsEnvironment(Environment):
                 score += 0.15  # Status of 106
             if "106" in reply and "101" in reply:
                 score += 0.2   # Mentioned both order numbers
-            return min(score, 1.0)
+            return self._clamp_score(score)
 
         # ── Hard: Policy-Gated Refund ─────────────────────────────
         if tid == "hard_policy_refund":
@@ -479,7 +496,7 @@ class EcoOpsEnvironment(Environment):
                 score += 0.15  # Confirmed to customer
             if "priyanka" in reply_lower:
                 score += 0.1   # Addressed by name
-            return min(score, 1.0)
+            return self._clamp_score(score)
 
         # ── Hard: VIP Escalation ──────────────────────────────────
         if tid == "hard_vip_escalation":
@@ -506,9 +523,24 @@ class EcoOpsEnvironment(Environment):
                 score += 0.1
             if len(reply) > 30:
                 score += 0.05
-            return min(score, 1.0)
+            return self._clamp_score(score)
 
-        return 0.0
+        return 0.01
+
+    # ═══════════════════════════════════════════════════════════════
+    #  METADATA
+    # ═══════════════════════════════════════════════════════════════
+    def get_metadata(self):
+        """Return environment metadata for the /metadata endpoint."""
+        from openenv.core.env_server.types import EnvironmentMetadata
+        return EnvironmentMetadata(
+            name="eco_ops_env",
+            description=(
+                "AI Support Engineering Environment — 7 tasks across "
+                "3 difficulty levels (easy/medium/hard) with multi-factor grading."
+            ),
+            version="0.1.0",
+        )
 
     # ═══════════════════════════════════════════════════════════════
     #  state property

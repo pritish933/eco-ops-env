@@ -5,3 +5,18 @@ runtime: fastapi
 app: server.app:app
 port: 8000
 
+tasks:
+  - task_id: easy_order_status
+    grader: true
+  - task_id: easy_product_info
+    grader: true
+  - task_id: medium_address_update
+    grader: true
+  - task_id: medium_cancel_order
+    grader: true
+  - task_id: medium_multi_order
+    grader: true
+  - task_id: hard_policy_refund
+    grader: true
+  - task_id: hard_vip_escalation
+    grader: true
