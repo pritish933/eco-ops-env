@@ -223,7 +223,7 @@ class EcoOpsEnvironment(Environment):
                 "the available tools to resolve their issue. End with 'reply'."
             ),
             tools_available=task["tools"],
-            reward=0.0,
+            reward=0.001,
             done=False,
         )
 
@@ -237,7 +237,7 @@ class EcoOpsEnvironment(Environment):
         args = action.action_args
 
         response = ""
-        reward = 0.0
+        reward = 0.001
         done = False
 
         db = self._state.db_orders
@@ -257,10 +257,10 @@ class EcoOpsEnvironment(Environment):
                     )
                     if oid not in self._state.orders_searched:
                         self._state.orders_searched.append(oid)
-                    reward = 0.0
+                    reward = 0.001
                 else:
                     response = f"Error: Order #{oid} not found in database."
-                    reward = 0.0
+                    reward = 0.001
 
             # ── search_product ──
             elif act == "search_product":
@@ -272,10 +272,10 @@ class EcoOpsEnvironment(Environment):
                         f"Product {sku}: name={p['name']}, "
                         f"price=${p['price']:.2f}, availability={stock_str}"
                     )
-                    reward = 0.0
+                    reward = 0.001
                 else:
                     response = f"Error: Product SKU '{sku}' not found in catalog."
-                    reward = 0.0
+                    reward = 0.001
 
             # ── update_address ──
             elif act == "update_address":
@@ -287,17 +287,17 @@ class EcoOpsEnvironment(Environment):
                             f"Error: Cannot update address — order #{oid} "
                             f"status is '{db[oid]['status']}'."
                         )
-                        reward = 0.0
+                        reward = 0.001
                     elif not new_addr:
                         response = "Error: new_address argument is required."
-                        reward = 0.0
+                        reward = 0.001
                     else:
                         db[oid]["address"] = new_addr
                         response = f"Success: Address for order #{oid} updated to '{new_addr}'."
-                        reward = 0.0
+                        reward = 0.001
                 else:
                     response = f"Error: Order #{oid} not found."
-                    reward = 0.0
+                    reward = 0.001
 
             # ── cancel_order ──
             elif act == "cancel_order":
@@ -306,17 +306,17 @@ class EcoOpsEnvironment(Environment):
                     if db[oid]["status"] == "Processing":
                         db[oid]["status"] = "Cancelled"
                         response = f"Success: Order #{oid} has been cancelled."
-                        reward = 0.0
+                        reward = 0.001
                     else:
                         response = (
                             f"Error: Cannot cancel order #{oid} — "
                             f"current status is '{db[oid]['status']}'. "
                             f"Only 'Processing' orders can be cancelled."
                         )
-                        reward = 0.0
+                        reward = 0.001
                 else:
                     response = f"Error: Order #{oid} not found."
-                    reward = 0.0
+                    reward = 0.001
 
             # ── get_policy ──
             elif act == "get_policy":
@@ -324,11 +324,11 @@ class EcoOpsEnvironment(Environment):
                 if topic in self.BASE_POLICIES:
                     response = f"Policy [{topic}]: {self.BASE_POLICIES[topic]}"
                     self._state.policy_checked = True
-                    reward = 0.0
+                    reward = 0.001
                 else:
                     available = ", ".join(f"'{k}'" for k in self.BASE_POLICIES)
                     response = f"Error: Policy topic '{topic}' not found. Available: {available}"
-                    reward = 0.0
+                    reward = 0.001
 
             # ── refund_order ──
             elif act == "refund_order":
@@ -336,10 +336,10 @@ class EcoOpsEnvironment(Environment):
                 if oid in db:
                     db[oid]["refunded"] = True
                     response = f"Success: Refund processed for order #{oid}."
-                    reward = 0.0
+                    reward = 0.001
                 else:
                     response = f"Error: Order #{oid} not found."
-                    reward = 0.0
+                    reward = 0.001
 
             # ── escalate ──
             elif act == "escalate":
@@ -349,7 +349,7 @@ class EcoOpsEnvironment(Environment):
                     f"Ticket escalated to Senior Support. Reason: '{reason}'. "
                     f"You now have elevated permissions to proceed."
                 )
-                reward = 0.0
+                reward = 0.001
 
             # ── reply (ends episode) ──
             elif act == "reply":
@@ -360,11 +360,11 @@ class EcoOpsEnvironment(Environment):
 
             else:
                 response = f"Error: Unknown action '{act}'. Check tools_available."
-                reward = 0.0
+                reward = 0.001
 
         except Exception as e:
             response = f"Action execution error: {type(e).__name__}: {e}"
-            reward = 0.0
+            reward = 0.001
 
         # Episode boundary
         if self._state.step_count >= 12 and not done:
@@ -393,7 +393,7 @@ class EcoOpsEnvironment(Environment):
         can produce 1.0 which would be rejected.
         """
         rounded = round(float(score), 4)
-        return max(0.01, min(rounded, 0.99))
+        return max(0.01, min(rounded, 0.98))
 
     # ═══════════════════════════════════════════════════════════════
     #  MULTI-FACTOR GRADER
