@@ -223,7 +223,7 @@ class EcoOpsEnvironment(Environment):
                 "the available tools to resolve their issue. End with 'reply'."
             ),
             tools_available=task["tools"],
-            reward=None,
+            reward=0.5,
             done=False,
         )
 
@@ -237,7 +237,7 @@ class EcoOpsEnvironment(Environment):
         args = action.action_args
 
         response = ""
-        reward = None
+        reward = 0.5
         done = False
 
         db = self._state.db_orders
