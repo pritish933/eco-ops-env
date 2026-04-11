@@ -219,8 +219,8 @@ def main():
         level = TASKS[task_id]["level"]
         print(f"  [{level.upper():6s}] {task_id:30s} -> {score:.4f}", file=sys.stderr)
 
-    total_avg = sum(scores.values()) / len(scores) if scores else 0.0
-    print(f"\n  OVERALL AVERAGE: {total_avg:.4f} / 1.00", file=sys.stderr)
+    total_avg = sum(scores.values()) / len(scores) if scores else 0
+    print(f"\n  OVERALL AVERAGE: {total_avg:.4f} / 1", file=sys.stderr)
 
     # Final marker for the full run, changed to avoid evaluator regex collision
     print(f"[SUMMARY] total_tasks={len(scores)} average_score={total_avg:.4f}")
