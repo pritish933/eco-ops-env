@@ -2,12 +2,17 @@
 Eco-Ops Inference Script.
 
 Runs a baseline LLM agent against the Eco-Ops environment (7 tasks).
-Complies with Meta's OpenEnv Phase 1 validation requirements.
+Complies with Meta's OpenEnv Phase 2 validation requirements.
 
 MANDATORY env vars:
     API_BASE_URL   The API endpoint for the LLM.
     MODEL_NAME     The model identifier to use for inference.
     HF_TOKEN       Your Hugging Face / API key.
+
+STDOUT LOG FORMAT:
+    [START] task=<task_id> env=eco_ops_env model=<model>
+    [STEP]  step=<N> action=<action_type> reward=<reward>
+    [END]   task=<task_id> success=<true|false> steps=<N> score=<score>
 """
 
 import os
@@ -26,13 +31,13 @@ from openai import OpenAI
 from server.eco_ops_env_environment import EcoOpsEnvironment, TASKS
 from models import EcoOpsAction
 
-# ── Mandatory Variables ────────────────────────────────────────────
+# -- Mandatory Variables ------------------------------------------------
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 HF_TOKEN = os.getenv("HF_TOKEN")
 MAX_STEPS = 7
 
-# ── Retry & Rate-Limit Configuration ──────────────────────────────
+# -- Retry & Rate-Limit Configuration ----------------------------------
 MAX_RETRIES = 3           # Number of retries on API failure
 RETRY_BASE_DELAY = 10     # Base delay in seconds (exponential backoff)
 DELAY_BETWEEN_CALLS = 2   # Seconds to wait between every API call
@@ -94,7 +99,7 @@ def call_llm_with_retry(client: OpenAI, messages: list) -> str:
             # Small delay before each call to avoid rate limits
             if attempt > 1:
                 delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))  # 20s, 40s, 80s
-                print(f"    [WAIT] Retry {attempt}/{MAX_RETRIES} - waiting {delay}s for credits to refresh...")
+                print(f"    [WAIT] Retry {attempt}/{MAX_RETRIES} - waiting {delay}s for credits to refresh...", file=sys.stderr)
                 time.sleep(delay)
             else:
                 time.sleep(DELAY_BETWEEN_CALLS)  # 2s delay between normal calls
@@ -112,10 +117,10 @@ def call_llm_with_retry(client: OpenAI, messages: list) -> str:
             is_rate_limit = "402" in error_str or "429" in error_str or "rate" in error_str.lower()
 
             if is_rate_limit and attempt < MAX_RETRIES:
-                print(f"  [WARN] API rate limit (attempt {attempt}/{MAX_RETRIES}): {error_str[:80]}")
+                print(f"  [WARN] API rate limit (attempt {attempt}/{MAX_RETRIES}): {error_str[:80]}", file=sys.stderr)
                 continue
             else:
-                print(f"  [ERR] API Error (attempt {attempt}/{MAX_RETRIES}): {error_str[:100]}")
+                print(f"  [ERR] API Error (attempt {attempt}/{MAX_RETRIES}): {error_str[:100]}", file=sys.stderr)
                 if attempt == MAX_RETRIES:
                     return '{"action_type": "reply", "action_args": {"message": "API failure."}}'
 
@@ -125,12 +130,12 @@ def call_llm_with_retry(client: OpenAI, messages: list) -> str:
 def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
     task_info = TASKS[task_id]
     level = task_info["level"].upper()
-    print(f"\n{'='*50}")
-    print(f"Task: {task_id} [{level}]")
-    print(f"{'='*50}")
+
+    # === [START] marker: emitted at beginning of each task ===
+    print(f"[START] task={task_id} env=eco_ops_env model={MODEL_NAME}")
+    sys.stdout.flush()
 
     obs = env.reset(task_id=task_id)
-    print(f"Ticket: {obs.ticket[:80]}...")
 
     # Build a proper multi-turn conversation for full context
     messages = [
@@ -145,19 +150,27 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
         """).strip()},
     ]
 
+    total_steps = 0
+
     for step in range(1, MAX_STEPS + 1):
         text = call_llm_with_retry(client, messages)
 
         action = parse_action(text)
-        print(f"  Step {step}: {action.action_type}({action.action_args})")
+        total_steps = step
 
         obs = env.step(action)
         r = obs.reward or 0.0
-        print(f"    → {obs.action_response[:80]}... | reward={r:.2f}")
+
+        # === [STEP] marker: emitted for every environment interaction ===
+        print(f"[STEP] step={step} action={action.action_type} reward={r:.4f} done={str(obs.done).lower()}")
+        sys.stdout.flush()
 
         if obs.done:
+            # Clamp score strictly to (0, 1) exclusive
             score = max(0.01, min(float(r), 0.99))
-            print(f"  [STEP] Task complete! Grader score: {score:.2f}")
+            # === [END] marker: emitted at end of each task ===
+            print(f"[END] task={task_id} success=true steps={total_steps} score={score:.4f}")
+            sys.stdout.flush()
             return score
 
         # Add assistant response + next user prompt to conversation
@@ -171,50 +184,44 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
             What is your next action? Reply with JSON only.
         """).strip()})
 
-    return 0.01  # exhausted steps without finishing
+    # Exhausted steps without finishing
+    score = 0.01
+    print(f"[END] task={task_id} success=false steps={total_steps} score={score:.4f}")
+    sys.stdout.flush()
+    return score
 
 
 def main():
     if not HF_TOKEN:
-        print("WARNING: HF_TOKEN not set. LLM calls may fail.")
+        print("WARNING: HF_TOKEN not set. LLM calls may fail.", file=sys.stderr)
 
-    print(f"\n[START] Eco-Ops Inference Starting...")
-    print(f"   Model: {MODEL_NAME}")
-    print(f"   API:   {API_BASE_URL}")
-    print(f"   Retry: {MAX_RETRIES} attempts with {RETRY_BASE_DELAY}s backoff")
-    print(f"   Delay: {DELAY_BETWEEN_CALLS}s between calls\n")
+    print(f"[START] task=all env=eco_ops_env model={MODEL_NAME}")
+    sys.stdout.flush()
 
     client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     env = EcoOpsEnvironment()
 
     scores: Dict[str, float] = {}
-    by_level: Dict[str, list] = {"easy": [], "medium": [], "hard": []}
 
     for task_id, task_info in TASKS.items():
-        print(f"\n[STEP] Running task: {task_id}")
         score = run_task(env, client, task_id)
         scores[task_id] = score
-        by_level[task_info["level"]].append(score)
-        print(f"[STEP] Task {task_id} score: {score:.2f}")
 
-    # ── Summary ──
-    print(f"\n{'*'*50}")
-    print("FINAL EVALUATION SCORES")
-    print("*" * 50)
+    # -- Summary (to stderr so it doesn't interfere with log parsing) --
+    print(f"\n{'*'*50}", file=sys.stderr)
+    print("FINAL EVALUATION SCORES", file=sys.stderr)
+    print("*" * 50, file=sys.stderr)
 
     for task_id, score in scores.items():
         level = TASKS[task_id]["level"]
-        print(f"  [{level.upper():6s}] {task_id:30s} → {score:.2f}")
-
-    print("-" * 50)
-    for level in ("easy", "medium", "hard"):
-        vals = by_level[level]
-        avg = sum(vals) / len(vals) if vals else 0.0
-        print(f"  {level.upper():6s} Average: {avg:.2f}")
+        print(f"  [{level.upper():6s}] {task_id:30s} -> {score:.4f}", file=sys.stderr)
 
     total_avg = sum(scores.values()) / len(scores) if scores else 0.0
-    print(f"\n  OVERALL AVERAGE: {total_avg:.2f} / 1.00")
-    print(f"\n[END] Eco-Ops Inference Complete.")
+    print(f"\n  OVERALL AVERAGE: {total_avg:.4f} / 1.00", file=sys.stderr)
+
+    # Final [END] marker for the full run
+    print(f"[END] task=all success=true steps={len(scores)} score={total_avg:.4f}")
+    sys.stdout.flush()
 
 
 if __name__ == "__main__":

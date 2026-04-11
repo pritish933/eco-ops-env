@@ -369,7 +369,7 @@ class EcoOpsEnvironment(Environment):
         # Episode boundary
         if self._state.step_count >= 12 and not done:
             done = True
-            reward = self._clamp_score(0.0)  # timed out = worst score
+            reward = 0.01  # timed out = worst score (strictly > 0)
             response += " | Episode terminated (max 12 steps reached)."
 
         return EcoOpsObservation(
@@ -388,13 +388,12 @@ class EcoOpsEnvironment(Environment):
 
         The OpenEnv evaluator requires scores in (0.0, 1.0) exclusive —
         exactly 0.0 and exactly 1.0 are rejected.
+
+        IMPORTANT: We round FIRST then clamp, because round(0.99995, 4)
+        can produce 1.0 which would be rejected.
         """
-        score = max(0.0, min(score, 1.0))  # first, clamp to [0, 1]
-        if score <= 0.0:
-            return 0.01  # floor for worst case
-        if score >= 1.0:
-            return 0.99  # ceiling for perfect case
-        return round(score, 4)
+        rounded = round(float(score), 4)
+        return max(0.01, min(rounded, 0.99))
 
     # ═══════════════════════════════════════════════════════════════
     #  MULTI-FACTOR GRADER
@@ -413,13 +412,13 @@ class EcoOpsEnvironment(Environment):
         if tid == "easy_order_status":
             score = 0.0
             if "transit" in reply_lower or "in transit" in reply_lower:
-                score += 0.5   # Correct status
+                score += 0.45  # Correct status
             if "pritish" in reply_lower:
                 score += 0.2   # Addressed customer by name
             if "101" in reply:
                 score += 0.15  # Referenced order number
             if len(reply) > 20:
-                score += 0.15  # Substantive reply
+                score += 0.1   # Substantive reply
             return self._clamp_score(score)
 
         # ── Easy: Product Info ────────────────────────────────────
@@ -428,11 +427,11 @@ class EcoOpsEnvironment(Environment):
             if "79.99" in reply or "79.99" in reply_lower:
                 score += 0.35  # Correct price
             if "stock" in reply_lower or "available" in reply_lower:
-                score += 0.3   # Mentioned availability
+                score += 0.25  # Mentioned availability
             if "headphone" in reply_lower or "wireless" in reply_lower:
                 score += 0.2   # Product name
             if len(reply) > 15:
-                score += 0.15  # Substantive
+                score += 0.1   # Substantive
             return self._clamp_score(score)
 
         # ── Medium: Address Update ────────────────────────────────
@@ -440,11 +439,11 @@ class EcoOpsEnvironment(Environment):
             score = 0.0
             addr = db[target]["address"].lower()
             if "123 new ave" in addr:
-                score += 0.5   # Address actually updated
+                score += 0.45  # Address actually updated
             elif "new ave" in addr:
-                score += 0.25  # Partially correct
+                score += 0.2   # Partially correct
             if target in self._state.orders_searched:
-                score += 0.25  # Checked order first
+                score += 0.2   # Checked order first
             if "update" in reply_lower or "changed" in reply_lower:
                 score += 0.15  # Confirmed to customer
             if len(reply) > 15:
@@ -455,11 +454,11 @@ class EcoOpsEnvironment(Environment):
         if tid == "medium_cancel_order":
             score = 0.0
             if db[target]["status"] == "Cancelled":
-                score += 0.5   # Order actually cancelled
+                score += 0.45  # Order actually cancelled
             if target in self._state.orders_searched:
                 score += 0.2   # Checked status first
             if "cancel" in reply_lower:
-                score += 0.15  # Confirmed cancellation
+                score += 0.1   # Confirmed cancellation
             if "priyanka" in reply_lower:
                 score += 0.15  # Addressed by name
             return self._clamp_score(score)
@@ -469,13 +468,13 @@ class EcoOpsEnvironment(Environment):
             score = 0.0
             searched = self._state.orders_searched
             if 106 in searched and 101 in searched:
-                score += 0.5   # Searched BOTH orders
+                score += 0.45  # Searched BOTH orders
             elif 106 in searched or 101 in searched:
                 score += 0.2   # Searched only one
             if "transit" in reply_lower or "in transit" in reply_lower:
                 score += 0.15  # Status of 101
             if "processing" in reply_lower:
-                score += 0.15  # Status of 106
+                score += 0.1   # Status of 106
             if "106" in reply and "101" in reply:
                 score += 0.2   # Mentioned both order numbers
             return self._clamp_score(score)
@@ -485,7 +484,7 @@ class EcoOpsEnvironment(Environment):
             score = 0.0
             is_refunded = db[target].get("refunded", False)
             if self._state.policy_checked:
-                score += 0.25  # Checked policy
+                score += 0.2   # Checked policy
             if is_refunded and self._state.policy_checked:
                 score += 0.35  # Correct: refunded after policy check
             elif is_refunded and not self._state.policy_checked:
@@ -493,7 +492,7 @@ class EcoOpsEnvironment(Environment):
             if target in self._state.orders_searched:
                 score += 0.15  # Investigated order
             if "refund" in reply_lower:
-                score += 0.15  # Confirmed to customer
+                score += 0.1   # Confirmed to customer
             if "priyanka" in reply_lower:
                 score += 0.1   # Addressed by name
             return self._clamp_score(score)
@@ -507,10 +506,10 @@ class EcoOpsEnvironment(Environment):
                 score += 0.2
             # Must check policy
             if self._state.policy_checked:
-                score += 0.15
+                score += 0.1
             # Must refund after both
             if is_refunded and self._state.escalated and self._state.policy_checked:
-                score += 0.3   # Gold path: escalate → policy → refund
+                score += 0.3   # Gold path: escalate -> policy -> refund
             elif is_refunded and not self._state.escalated:
                 score += 0.05  # Bad: refund without escalation
             elif is_refunded and not self._state.policy_checked:
@@ -520,7 +519,7 @@ class EcoOpsEnvironment(Environment):
             if "sarbapriya" in reply_lower:
                 score += 0.1
             if "escalat" in reply_lower:
-                score += 0.1
+                score += 0.05
             if len(reply) > 30:
                 score += 0.05
             return self._clamp_score(score)
