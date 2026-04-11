@@ -219,8 +219,8 @@ def main():
     total_avg = sum(scores.values()) / len(scores) if scores else 0.0
     print(f"\n  OVERALL AVERAGE: {total_avg:.4f} / 1.00", file=sys.stderr)
 
-    # Final [END] marker for the full run
-    print(f"[END] task=all success=true steps={len(scores)} score={total_avg:.4f}")
+    # Final marker for the full run, changed to avoid evaluator regex collision
+    print(f"[SUMMARY] total_tasks={len(scores)} average_score={total_avg:.4f}")
     sys.stdout.flush()
 
 
