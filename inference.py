@@ -159,7 +159,7 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
         total_steps = step
 
         obs = env.step(action)
-        r = obs.reward if obs.reward is not None else 0.0
+        r = obs.reward if obs.reward is not None else 0
 
         # === [STEP] marker: emitted for every environment interaction ===
         print(f"[STEP] step={step} action={action.action_type} reward={r:.4f} done={str(obs.done).lower()}")
