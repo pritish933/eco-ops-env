@@ -1,0 +1,35 @@
+﻿    [WAIT] Retry 3/3 - waiting 40s for credits to refresh...
+  [ERR] API Error (attempt 3/3): Error code: 402 - {'error': 'You have depleted your monthly included credits. Purchase pre-paid cred
+  Step 6: reply({'message': 'API failure.'})
+    → Final message sent to customer: 'API failure.'... | reward=0.75
+  [DONE] Task complete! Grader score: 0.75
+
+==================================================
+Task: hard_vip_escalation [HARD]
+==================================================
+Ticket: Customer (Sarbapriya): I'm a VIP customer and my order #105 has been delayed by ...
+  [WARN] API rate limit (attempt 1/3): Error code: 402 - {'error': 'You have depleted your monthly included credits. Pu
+    [WAIT] Retry 2/3 - waiting 20s for credits to refresh...
+  [WARN] API rate limit (attempt 2/3): Error code: 402 - {'error': 'You have depleted your monthly included credits. Pu
+    [WAIT] Retry 3/3 - waiting 40s for credits to refresh...
+  [ERR] API Error (attempt 3/3): Error code: 402 - {'error': 'You have depleted your monthly included credits. Purchase pre-paid cred
+  Step 1: reply({'message': 'API failure.'})
+    → Final message sent to customer: 'API failure.'... | reward=0.00
+  [DONE] Task complete! Grader score: 0.00
+
+**************************************************
+FINAL EVALUATION SCORES
+**************************************************
+  [EASY  ] easy_order_status              → 1.00
+  [EASY  ] easy_product_info              → 1.00
+  [MEDIUM] medium_address_update          → 1.00
+  [MEDIUM] medium_cancel_order            → 1.00
+  [MEDIUM] medium_multi_order             → 1.00
+  [HARD  ] hard_policy_refund             → 0.75
+  [HARD  ] hard_vip_escalation            → 0.00
+--------------------------------------------------
+  EASY   Average: 1.00
+  MEDIUM Average: 1.00
+  HARD   Average: 0.38
+
+  OVERALL AVERAGE: 0.82 / 1.00

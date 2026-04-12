@@ -1,0 +1,54 @@
+﻿.\.venv\Scripts\python.exe
+ : Traceback (most recent 
+call last):
+At line:1 char:169
++ ... 3-70B-Instruct"; .\.
+venv\Scripts\python.exe 
+inference.py 2>&1 | Out-F 
+...
++                      ~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: (T  
+  raceback (most recent   
+  call last)::String)     
+[], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+  File "C:\Users\PRITISH\O
+neDrive\Desktop\Meta\Hacka
+thon_Env\eco_ops_env\infer
+ence.py", line 212, in 
+<module>
+    main()
+    ~~~~^^
+  File "C:\Users\PRITISH\O
+neDrive\Desktop\Meta\Hacka
+thon_Env\eco_ops_env\infer
+ence.py", line 175, in 
+main
+    print(f"\n\U0001f680 
+Eco-Ops Inference 
+Starting...")
+    ~~~~~^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PRITISH\A
+ppData\Roaming\uv\python\c
+python-3.14-windows-x86_64
+-none\Lib\encodings\cp1252
+.py", line 19, in encode
+    return codecs.charmap_
+encode(input,self.errors,e
+ncoding_table)[0]
+           ~~~~~~~~~~~~~~~
+~~~~~~^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
+UnicodeEncodeError: 
+'charmap' codec can't 
+encode character 
+'\U0001f680' in position 
+2: character maps to 
+<undefined>

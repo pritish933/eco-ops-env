@@ -1,0 +1,75 @@
+﻿                          
+ Usage: openenv [OPTIONS] 
+ COMMAND [ARGS]...        
+                          
+ OpenEnv - An e2e         
+ framework for creating,  
+ deploying and using      
+ isolated execution       
+ environments for agentic 
+ RL training              
+                          
+┌─ Options ──────────────┐
+│ --ins…          Insta… │
+│                 compl… │
+│                 for    │
+│                 the    │
+│                 curre… │
+│                 shell. │
+│ --sho…          Show   │
+│                 compl… │
+│                 for    │
+│                 the    │
+│                 curre… │
+│                 shell, │
+│                 to     │
+│                 copy   │
+│                 it or  │
+│                 custo… │
+│                 the    │
+│                 insta… │
+│ --help          Show   │
+│                 this   │
+│                 messa… │
+│                 and    │
+│                 exit.  │
+└────────────────────────┘
+┌─ Commands ─────────────┐
+│ init      Initialize a │
+│           new OpenEnv  │
+│           environment  │
+│ build     Build Docker │
+│           images for   │
+│           OpenEnv      │
+│           environments │
+│ validate  Validate     │
+│           environment  │
+│           structure    │
+│           and          │
+│           deployment   │
+│           readiness    │
+│ push      Push an      │
+│           OpenEnv      │
+│           environment  │
+│           to Hugging   │
+│           Face Spaces  │
+│           or custom    │
+│           registry     │
+│ serve     Serve        │
+│           environments │
+│           locally      │
+│           (TODO: Phase │
+│           4)           │
+│ fork      Fork         │
+│           (duplicate)  │
+│           a Hugging    │
+│           Face Space   │
+│           to your      │
+│           account      │
+│ skills    Manage       │
+│           OpenEnv      │
+│           skills for   │
+│           AI           │
+│           assistants   │
+└────────────────────────┘
+

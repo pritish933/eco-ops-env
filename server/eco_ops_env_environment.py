@@ -116,34 +116,58 @@ class EcoOpsEnvironment(Environment):
     # ── Mock Databases ─────────────────────────────────────────────
     BASE_ORDERS: Dict[int, Dict[str, Any]] = {
         101: {
-            "status": "In Transit", "customer": "Pritish", "priority": "normal",
-            "address": "123 Beta St", "product": "SKU-A1",
-            "delay_days": 2, "refunded": False,
+            "status": "In Transit",
+            "customer": "Pritish",
+            "priority": "normal",
+            "address": "123 Beta St",
+            "product": "SKU-A1",
+            "delay_days": 2,
+            "refunded": False,
         },
         102: {
-            "status": "Processing", "customer": "Rajesh", "priority": "normal",
-            "address": "456 Old St", "product": "SKU-B2",
-            "delay_days": 5, "refunded": False,
+            "status": "Processing",
+            "customer": "Rajesh",
+            "priority": "normal",
+            "address": "456 Old St",
+            "product": "SKU-B2",
+            "delay_days": 5,
+            "refunded": False,
         },
         103: {
-            "status": "Delivered", "customer": "Raiyan", "priority": "VIP",
-            "address": "789 Gamma Rd", "product": "SKU-C3",
-            "delay_days": 19, "refunded": False,
+            "status": "Delivered",
+            "customer": "Raiyan",
+            "priority": "VIP",
+            "address": "789 Gamma Rd",
+            "product": "SKU-C3",
+            "delay_days": 19,
+            "refunded": False,
         },
         104: {
-            "status": "Processing", "customer": "Priyanka", "priority": "normal",
-            "address": "321 Delta Ln", "product": "SKU-A1",
-            "delay_days": 0, "refunded": False,
+            "status": "Processing",
+            "customer": "Priyanka",
+            "priority": "normal",
+            "address": "321 Delta Ln",
+            "product": "SKU-A1",
+            "delay_days": 0,
+            "refunded": False,
         },
         105: {
-            "status": "Shipped", "customer": "Sarbapriya", "priority": "VIP",
-            "address": "654 Epsilon Ave", "product": "SKU-D4",
-            "delay_days": 20, "refunded": False,
+            "status": "Shipped",
+            "customer": "Sarbapriya",
+            "priority": "VIP",
+            "address": "654 Epsilon Ave",
+            "product": "SKU-D4",
+            "delay_days": 20,
+            "refunded": False,
         },
         106: {
-            "status": "Processing", "customer": "Debapriya", "priority": "normal",
-            "address": "987 Zeta Blvd", "product": "SKU-E5",
-            "delay_days": 1, "refunded": False,
+            "status": "Processing",
+            "customer": "Debapriya",
+            "priority": "normal",
+            "address": "987 Zeta Blvd",
+            "product": "SKU-E5",
+            "delay_days": 1,
+            "refunded": False,
         },
     }
 
@@ -152,7 +176,7 @@ class EcoOpsEnvironment(Environment):
         "SKU-B2": {"name": "USB-C Hub", "price": 45.00, "in_stock": False},
         "SKU-C3": {"name": "Mechanical Keyboard", "price": 129.99, "in_stock": True},
         "SKU-D4": {"name": "4K Monitor Stand", "price": 199.99, "in_stock": True},
-        "SKU-E5": {"name": "Laptop Sleeve 15\"", "price": 34.99, "in_stock": True},
+        "SKU-E5": {"name": 'Laptop Sleeve 15"', "price": 34.99, "in_stock": True},
     }
 
     BASE_POLICIES: Dict[str, str] = {
@@ -375,7 +399,7 @@ class EcoOpsEnvironment(Environment):
         can produce 1.0 which would be rejected.
         """
         rounded = round(float(score), 4)
-        return max(0.05, min(rounded, 0.95))
+        return max(0.001, min(rounded, 0.999))
 
     # ═══════════════════════════════════════════════════════════════
     #  MULTI-FACTOR GRADER
@@ -396,11 +420,11 @@ class EcoOpsEnvironment(Environment):
             if "transit" in reply_lower or "in transit" in reply_lower:
                 score += 0.45  # Correct status
             if "pritish" in reply_lower:
-                score += 0.2   # Addressed customer by name
+                score += 0.2  # Addressed customer by name
             if "101" in reply:
                 score += 0.15  # Referenced order number
             if len(reply) > 20:
-                score += 0.1   # Substantive reply
+                score += 0.1  # Substantive reply
             return self._clamp_score(score)
 
         # ── Easy: Product Info ────────────────────────────────────
@@ -411,9 +435,9 @@ class EcoOpsEnvironment(Environment):
             if "stock" in reply_lower or "available" in reply_lower:
                 score += 0.25  # Mentioned availability
             if "headphone" in reply_lower or "wireless" in reply_lower:
-                score += 0.2   # Product name
+                score += 0.2  # Product name
             if len(reply) > 15:
-                score += 0.1   # Substantive
+                score += 0.1  # Substantive
             return self._clamp_score(score)
 
         # ── Medium: Address Update ────────────────────────────────
@@ -423,9 +447,9 @@ class EcoOpsEnvironment(Environment):
             if "123 new ave" in addr:
                 score += 0.45  # Address actually updated
             elif "new ave" in addr:
-                score += 0.2   # Partially correct
+                score += 0.2  # Partially correct
             if target in self._state.orders_searched:
-                score += 0.2   # Checked order first
+                score += 0.2  # Checked order first
             if "update" in reply_lower or "changed" in reply_lower:
                 score += 0.15  # Confirmed to customer
             if len(reply) > 15:
@@ -438,9 +462,9 @@ class EcoOpsEnvironment(Environment):
             if db[target]["status"] == "Cancelled":
                 score += 0.45  # Order actually cancelled
             if target in self._state.orders_searched:
-                score += 0.2   # Checked status first
+                score += 0.2  # Checked status first
             if "cancel" in reply_lower:
-                score += 0.1   # Confirmed cancellation
+                score += 0.1  # Confirmed cancellation
             if "priyanka" in reply_lower:
                 score += 0.15  # Addressed by name
             return self._clamp_score(score)
@@ -452,13 +476,13 @@ class EcoOpsEnvironment(Environment):
             if 106 in searched and 101 in searched:
                 score += 0.45  # Searched BOTH orders
             elif 106 in searched or 101 in searched:
-                score += 0.2   # Searched only one
+                score += 0.2  # Searched only one
             if "transit" in reply_lower or "in transit" in reply_lower:
                 score += 0.15  # Status of 101
             if "processing" in reply_lower:
-                score += 0.1   # Status of 106
+                score += 0.1  # Status of 106
             if "106" in reply and "101" in reply:
-                score += 0.2   # Mentioned both order numbers
+                score += 0.2  # Mentioned both order numbers
             return self._clamp_score(score)
 
         # ── Hard: Policy-Gated Refund ─────────────────────────────
@@ -466,17 +490,17 @@ class EcoOpsEnvironment(Environment):
             score = 0
             is_refunded = db[target].get("refunded", False)
             if self._state.policy_checked:
-                score += 0.2   # Checked policy
+                score += 0.2  # Checked policy
             if is_refunded and self._state.policy_checked:
                 score += 0.35  # Correct: refunded after policy check
             elif is_refunded and not self._state.policy_checked:
-                score += 0.1   # Bad: refunded without checking
+                score += 0.1  # Bad: refunded without checking
             if target in self._state.orders_searched:
                 score += 0.15  # Investigated order
             if "refund" in reply_lower:
-                score += 0.1   # Confirmed to customer
+                score += 0.1  # Confirmed to customer
             if "priyanka" in reply_lower:
-                score += 0.1   # Addressed by name
+                score += 0.1  # Addressed by name
             return self._clamp_score(score)
 
         # ── Hard: VIP Escalation ──────────────────────────────────
@@ -491,7 +515,7 @@ class EcoOpsEnvironment(Environment):
                 score += 0.1
             # Must refund after both
             if is_refunded and self._state.escalated and self._state.policy_checked:
-                score += 0.3   # Gold path: escalate -> policy -> refund
+                score += 0.3  # Gold path: escalate -> policy -> refund
             elif is_refunded and not self._state.escalated:
                 score += 0.05  # Bad: refund without escalation
             elif is_refunded and not self._state.policy_checked:
@@ -514,6 +538,7 @@ class EcoOpsEnvironment(Environment):
     def get_metadata(self):
         """Return environment metadata for the /metadata endpoint."""
         from openenv.core.env_server.types import EnvironmentMetadata
+
         return EnvironmentMetadata(
             name="eco_ops_env",
             description=(
