@@ -247,7 +247,7 @@ class EcoOpsEnvironment(Environment):
                 "the available tools to resolve their issue. End with 'reply'."
             ),
             tools_available=task["tools"],
-            reward=0,
+            reward=0.01,  # Must be strictly in (0, 1) — validator checks reset() too
             done=False,
         )
 
