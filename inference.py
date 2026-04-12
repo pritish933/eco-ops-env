@@ -5,14 +5,14 @@ Runs a baseline LLM agent against the Eco-Ops environment (7 tasks).
 Complies with Meta's OpenEnv Phase 2 validation requirements.
 
 MANDATORY env vars:
-    API_BASE_URL   The API endpoint for the LLM.
-    MODEL_NAME     The model identifier to use for inference.
-    HF_TOKEN       Your Hugging Face / API key.
+    API_BASE_URL   The API endpoint for the LLM (default provided).
+    MODEL_NAME     The model identifier to use (default provided).
+    HF_TOKEN       Your Hugging Face / API key (MANDATORY — no default).
 
-STDOUT LOG FORMAT:
-    [START] task=<task_id> env=eco_ops_env model=<model>
-    [STEP]  step=<N> action=<action_type> reward=<reward>
-    [END]   task=<task_id> success=<true|false> steps=<N> score=<score>
+STDOUT LOG FORMAT (exact, per hackathon spec):
+    [START] task=<task_name> env=<benchmark> model=<model_name>
+    [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
+    [END]   success=<true|false> steps=<n> rewards=<r1,r2,...,rn>
 """
 
 import os
@@ -20,28 +20,28 @@ import sys
 import json
 import time
 import textwrap
-from typing import Dict
-
-# Fix Windows Unicode encoding for emoji/UTF-8 output
-if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+from typing import Dict, List
 
 from openai import OpenAI
 
 from server.eco_ops_env_environment import EcoOpsEnvironment, TASKS
 from models import EcoOpsAction
 
-# -- Mandatory Variables ------------------------------------------------
+# ── Environment Variables ───────────────────────────────────────────
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
-HF_TOKEN = os.getenv("HF_TOKEN")
-MAX_STEPS = 7
+MODEL_NAME   = os.getenv("MODEL_NAME",   "gpt-4o-mini")
+HF_TOKEN     = os.getenv("HF_TOKEN")
 
-# -- Retry & Rate-Limit Configuration ----------------------------------
-MAX_RETRIES = 3  # Number of retries on API failure
-RETRY_BASE_DELAY = 10  # Base delay in seconds (exponential backoff)
-DELAY_BETWEEN_CALLS = 2  # Seconds to wait between every API call
+if HF_TOKEN is None:
+    raise ValueError("HF_TOKEN environment variable is required")
 
+# ── Tuning ──────────────────────────────────────────────────────────
+MAX_STEPS          = 7
+MAX_RETRIES        = 3
+RETRY_BASE_DELAY   = 10   # seconds (exponential: 20s, 40s, 80s)
+DELAY_BETWEEN_CALLS = 2   # seconds between normal API calls
+
+# ── System Prompt ───────────────────────────────────────────────────
 SYSTEM_PROMPT = textwrap.dedent("""
     You are an AI Support Engineering Agent (Eco-Ops).
     You receive a customer support ticket. You must use the available tools
@@ -59,22 +59,25 @@ SYSTEM_PROMPT = textwrap.dedent("""
     No markdown, no extra text.
 
     Available tools:
-    - search_order:   {"action_type": "search_order", "action_args": {"order_id": <int>}}
+    - search_order:   {"action_type": "search_order",   "action_args": {"order_id": <int>}}
     - search_product: {"action_type": "search_product", "action_args": {"sku": "<str>"}}
     - update_address: {"action_type": "update_address", "action_args": {"order_id": <int>, "new_address": "<str>"}}
-    - cancel_order:   {"action_type": "cancel_order", "action_args": {"order_id": <int>}}
-    - get_policy:     {"action_type": "get_policy", "action_args": {"topic": "<str>"}}
+    - cancel_order:   {"action_type": "cancel_order",   "action_args": {"order_id": <int>}}
+    - get_policy:     {"action_type": "get_policy",     "action_args": {"topic": "<str>"}}
                       topics: "delay_refund", "cancellation", "vip_escalation"
-    - refund_order:   {"action_type": "refund_order", "action_args": {"order_id": <int>}}
-    - escalate:       {"action_type": "escalate", "action_args": {"reason": "<str>"}}
-    - reply:          {"action_type": "reply", "action_args": {"message": "<str>"}}
+    - refund_order:   {"action_type": "refund_order",   "action_args": {"order_id": <int>}}
+    - escalate:       {"action_type": "escalate",       "action_args": {"reason": "<str>"}}
+    - reply:          {"action_type": "reply",           "action_args": {"message": "<str>"}}
 
     Example:
     {"action_type": "search_order", "action_args": {"order_id": 101}}
 """).strip()
 
 
+# ── Helpers ─────────────────────────────────────────────────────────
+
 def parse_action(text: str) -> EcoOpsAction:
+    """Parse LLM output into an EcoOpsAction. Falls back to a safe reply."""
     try:
         clean = text.replace("```json", "").replace("```", "").strip()
         data = json.loads(clean)
@@ -85,29 +88,29 @@ def parse_action(text: str) -> EcoOpsAction:
     except Exception:
         return EcoOpsAction(
             action_type="reply",
-            action_args={
-                "message": "I apologize, I encountered an error processing your request."
-            },
+            action_args={"message": "I apologize, I encountered an error processing your request."},
         )
 
 
+def format_action(action: EcoOpsAction) -> str:
+    """Produce a compact single-line action string for [STEP] logging."""
+    args = ",".join(f"{k}={v}" for k, v in action.action_args.items())
+    return f"{action.action_type}({args})"
+
+
 def call_llm_with_retry(client: OpenAI, messages: list) -> str:
-    """
-    Call the LLM with retry logic and exponential backoff.
-    Handles 402 (credits depleted) and other transient errors.
-    """
+    """Call LLM with exponential backoff on rate-limit / credit errors."""
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            # Small delay before each call to avoid rate limits
             if attempt > 1:
-                delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))  # 20s, 40s, 80s
+                delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))
                 print(
-                    f"    [WAIT] Retry {attempt}/{MAX_RETRIES} - waiting {delay}s for credits to refresh...",
+                    f"    [WAIT] Retry {attempt}/{MAX_RETRIES} — waiting {delay}s...",
                     file=sys.stderr,
                 )
                 time.sleep(delay)
             else:
-                time.sleep(DELAY_BETWEEN_CALLS)  # 2s delay between normal calls
+                time.sleep(DELAY_BETWEEN_CALLS)
 
             completion = client.chat.completions.create(
                 model=MODEL_NAME,
@@ -118,134 +121,144 @@ def call_llm_with_retry(client: OpenAI, messages: list) -> str:
             return completion.choices[0].message.content or ""
 
         except Exception as e:
-            error_str = str(e)
-            is_rate_limit = (
-                "402" in error_str or "429" in error_str or "rate" in error_str.lower()
+            err = str(e)
+            is_rate = "402" in err or "429" in err or "rate" in err.lower()
+            print(
+                f"  [ERR] API error attempt {attempt}/{MAX_RETRIES}: {err[:100]}",
+                file=sys.stderr,
             )
+            if not (is_rate and attempt < MAX_RETRIES):
+                break
 
-            if is_rate_limit and attempt < MAX_RETRIES:
-                print(
-                    f"  [WARN] API rate limit (attempt {attempt}/{MAX_RETRIES}): {error_str[:80]}",
-                    file=sys.stderr,
-                )
-                continue
-            else:
-                print(
-                    f"  [ERR] API Error (attempt {attempt}/{MAX_RETRIES}): {error_str[:100]}",
-                    file=sys.stderr,
-                )
-                if attempt == MAX_RETRIES:
-                    return '{"action_type": "reply", "action_args": {"message": "API failure."}}'
+    return '{"action_type": "reply", "action_args": {"message": "API failure — unable to process request."}}'
 
-    return '{"action_type": "reply", "action_args": {"message": "API failure."}}'
 
+# ── Core task runner ─────────────────────────────────────────────────
 
 def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
-    task_info = TASKS[task_id]
-    level = task_info["level"].upper()
+    """
+    Run one full episode for task_id.
 
-    # === [START] marker: emitted at beginning of each task ===
-    print(f"[START] task={task_id} env=eco_ops_env model={MODEL_NAME}")
-    sys.stdout.flush()
+    Emits (to stdout):
+        [START] task=<task_id> env=eco_ops_env model=<MODEL_NAME>
+        [STEP]  step=<n> action=<str> reward=<0.00> done=<bool> error=<msg|null>
+        [END]   success=<true|false> steps=<n> rewards=<r1,r2,...,rn>
 
-    obs = env.reset(task_id=task_id)
+    [END] is always emitted — even on exception.
+    """
+    # ── [START] ────────────────────────────────────────────────────
+    print(f"[START] task={task_id} env=eco_ops_env model={MODEL_NAME}", flush=True)
 
-    # Build a proper multi-turn conversation for full context
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": textwrap.dedent(f"""
-            Step 1 of {MAX_STEPS}
-            Customer Ticket: {obs.ticket}
-            Last Response: {obs.action_response}
-            Tools Available: {obs.tools_available}
-
-            What is your next action? Reply with JSON only.
-        """).strip(),
-        },
-    ]
-
+    rewards: List[float] = []
     total_steps = 0
+    success = False
 
-    for step in range(1, MAX_STEPS + 1):
-        text = call_llm_with_retry(client, messages)
+    try:
+        obs = env.reset(task_id=task_id)
 
-        action = parse_action(text)
-        total_steps = step
-
-        obs = env.step(action)
-        r = obs.reward if obs.reward is not None else 0
-
-        # === [STEP] marker: emitted for every environment interaction ===
-        print(
-            f"[STEP] step={step} action={action.action_type} reward={r:.4f} done={str(obs.done).lower()}"
-        )
-        sys.stdout.flush()
-
-        if obs.done:
-            score = max(0.05, min(float(r), 0.95))
-            # === [END] marker: emitted at end of each task ===
-            print(
-                f"[END] task={task_id} success=true steps={total_steps} score={score:.4f}"
-            )
-            sys.stdout.flush()
-            return score
-
-        # Add assistant response + next user prompt to conversation
-        messages.append({"role": "assistant", "content": text})
-        messages.append(
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
                 "content": textwrap.dedent(f"""
-            Step {step + 1} of {MAX_STEPS}
-            Customer Ticket: {obs.ticket}
-            Last Response: {obs.action_response}
-            Tools Available: {obs.tools_available}
+                    Step 1 of {MAX_STEPS}
+                    Customer Ticket: {obs.ticket}
+                    Last Response:   {obs.action_response}
+                    Tools Available: {obs.tools_available}
 
-            What is your next action? Reply with JSON only.
-        """).strip(),
-            }
+                    What is your next action? Reply with JSON only.
+                """).strip(),
+            },
+        ]
+
+        for step in range(1, MAX_STEPS + 1):
+            total_steps = step
+
+            # LLM decision
+            text = call_llm_with_retry(client, messages)
+            action = parse_action(text)
+            action_str = format_action(action)
+
+            # Environment step
+            error_msg = "null"
+            try:
+                obs = env.step(action)
+                reward = obs.reward if obs.reward is not None else 0.01
+            except Exception as step_err:
+                error_msg = str(step_err).replace("\n", " ")[:120]
+                reward = 0.01
+                obs = type("_Obs", (), {"done": True, "reward": reward,
+                                         "action_response": error_msg,
+                                         "ticket": "", "tools_available": []})()
+
+            rewards.append(float(reward))
+
+            # ── [STEP] ─────────────────────────────────────────────
+            print(
+                f"[STEP] step={step} action={action_str} "
+                f"reward={reward:.2f} done={str(obs.done).lower()} "
+                f"error={error_msg}",
+                flush=True,
+            )
+
+            if obs.done:
+                success = True
+                break
+
+            # Build next conversation turn
+            messages.append({"role": "assistant", "content": text})
+            messages.append({
+                "role": "user",
+                "content": textwrap.dedent(f"""
+                    Step {step + 1} of {MAX_STEPS}
+                    Customer Ticket: {obs.ticket}
+                    Last Response:   {obs.action_response}
+                    Tools Available: {obs.tools_available}
+
+                    What is your next action? Reply with JSON only.
+                """).strip(),
+            })
+
+    except Exception as ep_err:
+        # Unexpected episode-level crash — still emit [END] below
+        print(f"  [ERR] Episode error: {ep_err}", file=sys.stderr)
+        rewards = rewards or [0.01]
+        success = False
+
+    finally:
+        # ── [END] — always emitted ─────────────────────────────────
+        rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.01"
+        print(
+            f"[END] success={str(success).lower()} steps={total_steps} rewards={rewards_str}",
+            flush=True,
         )
 
-    # Exhausted steps without finishing
-    score = 0.05
-    print(f"[END] task={task_id} success=false steps={total_steps} score={score:.4f}")
-    sys.stdout.flush()
-    return score
+    # Return the final reward (last element = terminal step reward)
+    return rewards[-1] if rewards else 0.01
 
+
+# ── Main ─────────────────────────────────────────────────────────────
 
 def main():
-    if not HF_TOKEN:
-        print("WARNING: HF_TOKEN not set. LLM calls may fail.", file=sys.stderr)
-
-    print(f"[START] task=all env=eco_ops_env model={MODEL_NAME}")
-    sys.stdout.flush()
-
-    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN if HF_TOKEN else "dummy")
+    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     env = EcoOpsEnvironment()
 
     scores: Dict[str, float] = {}
 
-    for task_id, task_info in TASKS.items():
+    for task_id in TASKS:
         score = run_task(env, client, task_id)
         scores[task_id] = score
 
-    # -- Summary (to stderr so it doesn't interfere with log parsing) --
-    print(f"\n{'*' * 50}", file=sys.stderr)
+    # Summary to stderr (not parsed by validator)
+    print("\n" + "=" * 55, file=sys.stderr)
     print("FINAL EVALUATION SCORES", file=sys.stderr)
-    print("*" * 50, file=sys.stderr)
-
+    print("=" * 55, file=sys.stderr)
     for task_id, score in scores.items():
-        level = TASKS[task_id]["level"]
-        print(f"  [{level.upper():6s}] {task_id:30s} -> {score:.4f}", file=sys.stderr)
-
-    total_avg = sum(scores.values()) / len(scores) if scores else 0
-    print(f"\n  OVERALL AVERAGE: {total_avg:.4f} / 1", file=sys.stderr)
-
-    # Final marker for the full run, changed to avoid evaluator regex collision
-    print(f"[SUMMARY] total_tasks={len(scores)} average_score={total_avg:.4f}")
-    sys.stdout.flush()
+        level = TASKS[task_id]["level"].upper()
+        print(f"  [{level:6s}] {task_id:30s} -> {score:.4f}", file=sys.stderr)
+    avg = sum(scores.values()) / len(scores) if scores else 0.0
+    print(f"\n  OVERALL AVERAGE: {avg:.4f}", file=sys.stderr)
+    print("=" * 55, file=sys.stderr)
 
 
 if __name__ == "__main__":
