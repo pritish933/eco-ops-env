@@ -184,7 +184,7 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
         sys.stdout.flush()
 
         if obs.done:
-            score = max(0.001, min(float(r), 0.999))
+            score = max(0.05, min(float(r), 0.95))
             # === [END] marker: emitted at end of each task ===
             print(
                 f"[END] task={task_id} success=true steps={total_steps} score={score:.4f}"
@@ -209,7 +209,7 @@ def run_task(env: EcoOpsEnvironment, client: OpenAI, task_id: str) -> float:
         )
 
     # Exhausted steps without finishing
-    score = 0.001
+    score = 0.05
     print(f"[END] task={task_id} success=false steps={total_steps} score={score:.4f}")
     sys.stdout.flush()
     return score

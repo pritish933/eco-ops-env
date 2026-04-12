@@ -7,5 +7,6 @@
 """Eco Ops Env environment server components."""
 
 from .eco_ops_env_environment import EcoOpsEnvironment
+from .graders import EasyGrader, MediumGrader, HardGrader
 
-__all__ = ["EcoOpsEnvironment"]
+__all__ = ["EcoOpsEnvironment", "EasyGrader", "MediumGrader", "HardGrader"]

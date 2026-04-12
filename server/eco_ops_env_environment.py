@@ -261,7 +261,7 @@ class EcoOpsEnvironment(Environment):
         args = action.action_args
 
         response = ""
-        reward = 0
+        reward = 0.01  # Non-zero: validator requires every reward strictly in (0, 1)
         done = False
 
         db = self._state.db_orders
@@ -375,7 +375,7 @@ class EcoOpsEnvironment(Environment):
         # Episode boundary
         if self._state.step_count >= 12 and not done:
             done = True
-            reward = 0.05  # timed out = worst score (strictly > 0)
+            reward = 0.05  # timed out = worst score (strictly > 0, < 1)
             response += " | Episode terminated (max 12 steps reached)."
 
         return EcoOpsObservation(
@@ -394,12 +394,12 @@ class EcoOpsEnvironment(Environment):
 
         The OpenEnv evaluator requires scores in (0.0, 1.0) exclusive —
         exactly 0.0 and exactly 1.0 are rejected.
-
-        IMPORTANT: We round FIRST then clamp, because round(0.99995, 4)
-        can produce 1.0 which would be rejected.
+        
+        Using stricter bounds (0.1, 0.9) to prevent any 1-decimal or 2-decimal 
+        rounding from turning values into 0.0 or 1.0.
         """
         rounded = round(float(score), 4)
-        return max(0.001, min(rounded, 0.999))
+        return max(0.1, min(rounded, 0.9))
 
     # ═══════════════════════════════════════════════════════════════
     #  MULTI-FACTOR GRADER

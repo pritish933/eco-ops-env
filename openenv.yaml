@@ -7,16 +7,16 @@ port: 8000
 
 tasks:
   - task_id: easy_order_status
-    grader: true
+    grader: server.graders:EasyGrader
   - task_id: easy_product_info
-    grader: true
+    grader: server.graders:EasyGrader
   - task_id: medium_address_update
-    grader: true
+    grader: server.graders:MediumGrader
   - task_id: medium_cancel_order
-    grader: true
+    grader: server.graders:MediumGrader
   - task_id: medium_multi_order
-    grader: true
+    grader: server.graders:MediumGrader
   - task_id: hard_policy_refund
-    grader: true
+    grader: server.graders:HardGrader
   - task_id: hard_vip_escalation
-    grader: true
+    grader: server.graders:HardGrader
