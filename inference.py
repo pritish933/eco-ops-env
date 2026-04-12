@@ -256,7 +256,7 @@ def main():
     for task_id, score in scores.items():
         level = TASKS[task_id]["level"].upper()
         print(f"  [{level:6s}] {task_id:30s} -> {score:.4f}", file=sys.stderr)
-    avg = sum(scores.values()) / len(scores) if scores else 0.0
+    avg = sum(scores.values()) / len(scores) if scores else 0.01
     print(f"\n  OVERALL AVERAGE: {avg:.4f}", file=sys.stderr)
     print("=" * 55, file=sys.stderr)
 

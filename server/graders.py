@@ -42,7 +42,7 @@ class EasyGrader:
         if submission is None:
             return self.DEFAULT_SCORE
 
-        score = 0.0
+        score = 0.01
         text = str(submission).lower()
 
         # Easy: order status
@@ -86,7 +86,7 @@ class MediumGrader:
         if submission is None:
             return self.DEFAULT_SCORE
 
-        score = 0.0
+        score = 0.01
         text = str(submission).lower()
 
         if "cancel" in text or "cancelled" in text:
@@ -128,7 +128,7 @@ class HardGrader:
         if submission is None:
             return self.DEFAULT_SCORE
 
-        score = 0.0
+        score = 0.01
         text = str(submission).lower()
 
         if "refund" in text:

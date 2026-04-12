@@ -416,7 +416,7 @@ class EcoOpsEnvironment(Environment):
 
         # ── Easy: Order Status ────────────────────────────────────
         if tid == "easy_order_status":
-            score = 0
+            score = 0.01
             if "transit" in reply_lower or "in transit" in reply_lower:
                 score += 0.45  # Correct status
             if "pritish" in reply_lower:
@@ -429,7 +429,7 @@ class EcoOpsEnvironment(Environment):
 
         # ── Easy: Product Info ────────────────────────────────────
         if tid == "easy_product_info":
-            score = 0
+            score = 0.01
             if "79.99" in reply or "79.99" in reply_lower:
                 score += 0.35  # Correct price
             if "stock" in reply_lower or "available" in reply_lower:
@@ -442,7 +442,7 @@ class EcoOpsEnvironment(Environment):
 
         # ── Medium: Address Update ────────────────────────────────
         if tid == "medium_address_update":
-            score = 0
+            score = 0.01
             addr = db[target]["address"].lower()
             if "123 new ave" in addr:
                 score += 0.45  # Address actually updated
@@ -458,7 +458,7 @@ class EcoOpsEnvironment(Environment):
 
         # ── Medium: Cancel Order ──────────────────────────────────
         if tid == "medium_cancel_order":
-            score = 0
+            score = 0.01
             if db[target]["status"] == "Cancelled":
                 score += 0.45  # Order actually cancelled
             if target in self._state.orders_searched:
@@ -471,7 +471,7 @@ class EcoOpsEnvironment(Environment):
 
         # ── Medium: Multi-Order ───────────────────────────────────
         if tid == "medium_multi_order":
-            score = 0
+            score = 0.01
             searched = self._state.orders_searched
             if 106 in searched and 101 in searched:
                 score += 0.45  # Searched BOTH orders
@@ -487,7 +487,7 @@ class EcoOpsEnvironment(Environment):
 
         # ── Hard: Policy-Gated Refund ─────────────────────────────
         if tid == "hard_policy_refund":
-            score = 0
+            score = 0.01
             is_refunded = db[target].get("refunded", False)
             if self._state.policy_checked:
                 score += 0.2  # Checked policy
@@ -505,7 +505,7 @@ class EcoOpsEnvironment(Environment):
 
         # ── Hard: VIP Escalation ──────────────────────────────────
         if tid == "hard_vip_escalation":
-            score = 0
+            score = 0.01
             is_refunded = db[target].get("refunded", False)
             # Must escalate VIP
             if self._state.escalated:
